@@ -100,4 +100,4 @@ Removing the `ESCAPE` clause is safe since wildcard escaping is already handled 
 
 ## Related issue
 
-https://github.com/symfony/ux/issues/XXXX
+https://github.com/symfony/ux/issues/3668
