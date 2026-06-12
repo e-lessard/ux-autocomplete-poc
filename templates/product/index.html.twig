@@ -1,0 +1,21 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<div class="container mt-4">
+
+    <h1>POC Product Autocomplete</h1>
+
+    {{ form_start(form) }}
+
+        <div class="mb-3">
+            {{ form_row(form.product) }}
+        </div>
+
+        <button class="btn btn-primary">
+            Valider
+        </button>
+
+    {{ form_end(form) }}
+
+</div>
+{% endblock %}
