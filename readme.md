@@ -52,11 +52,11 @@ private ?string $code = null;
 
 ## Tested databases
 
-| Database   | Bug reproduced | Notes                           |
-|------------|----------------|---------------------------------|
-| PostgreSQL | ✅ Yes          | SQLSTATE[HY093] on keystroke    |
-| MySQL      | ❌ No           | `ESCAPE '\'` accepted natively  |
-| SQLite     | ❌ No           | No error, search works          |
+| Database   | Bug reproduced | Notes                          |
+|------------|----------------|--------------------------------|
+| PostgreSQL | ✅ Yes          | SQLSTATE[HY093] on keystroke   |
+| MySQL      | ❌ No           | `ESCAPE '\'` accepted natively |
+| SQLite     | ❌ No           | No error, search works         |
 
 ## How to reproduce
 
@@ -72,31 +72,25 @@ Open `http://localhost:8000/product` and type in the autocomplete field.
 
 ## Proposed fix
 
-In `src/Doctrine/EntitySearchUtil.php`, replace:
+The fix has two parts.
+
+First, retrieve the current database platform from the query builder's entity manager:
 
 ```php
-'text_query' => '%'.addcslashes($lowercaseQuery, '\\%_').'%',
+$platform = $queryBuilder->getEntityManager()->getConnection()->getDatabasePlatform();
 ```
 
-with:
+Then, conditionally add the `ESCAPE` clause only for non-PostgreSQL platforms:
 
 ```php
-'text_query' => '%'.$queryBuilder->getEntityManager()->getConnection()->getDatabasePlatform()->escapeStringForLike($lowercaseQuery, '\\').'%',
+$escapeClause = $platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform ? '' : " ESCAPE '\\'";
+$expressions[] = \sprintf('LOWER(%s.%s) LIKE :query_for_text' . $escapeClause, $entityName, $propertyName);
 ```
 
-And replace:
-
-```php
-$expressions[] = \sprintf("LOWER(%s.%s) LIKE :query_for_text ESCAPE '\\'", $entityName, $propertyName);
-```
-
-with:
-
-```php
-$expressions[] = \sprintf('LOWER(%s.%s) LIKE :query_for_text', $entityName, $propertyName);
-```
-
-Removing the `ESCAPE` clause is safe since wildcard escaping is already handled upstream. The `escapeStringForLike` method makes the escaping driver-aware, covering PostgreSQL, MySQL, and SQLite correctly.
+**Why this approach:**
+- PostgreSQL rejects `ESCAPE '\'` entirely — removing it fixes the crash
+- SQLite and MySQL require the `ESCAPE` clause to correctly interpret the backslash-escaped wildcards (`\%`, `\_`) produced by `addcslashes`
+- The wildcard escaping via `addcslashes($lowercaseQuery, '\\%_')` is kept unchanged
 
 ## Related issue
 
